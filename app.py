@@ -142,38 +142,33 @@ def get_excel_template():
 # 3. QUẢN LÝ DỮ LIỆU & LOGIC THÔNG MINH
 # ==========================================
 
-# XÓA BỎ HÀM SAVE_ALL CŨ VÀ DÁN ĐOẠN NÀY VÀO:
 def save_all():
-    # 1. Sắp xếp lại kho thuốc theo tên Thành Phần trước khi lưu
+    # 1. Sắp xếp kho thuốc theo Thành Phần trước khi lưu
     if not st.session_state.df_kho.empty:
         st.session_state.df_kho = st.session_state.df_kho.sort_values(by='Thành Phần', ascending=True)
     
     # 2. ĐỒNG BỘ DỮ LIỆU LÊN CLOUD (GOOGLE SHEETS)
-    # LƯU Ý: Đã xóa bỏ hoàn toàn các dòng .to_csv() để tránh lỗi Permission Denied (Lỗi 13)
+    # LƯU Ý: Đã xóa sạch các dòng .to_csv() cũ để diệt tận gốc lỗi KeyError và Permission Denied
     try:
         # Cập nhật bảng Kho Thuốc
         conn.update(worksheet="KhoThuoc", data=st.session_state.df_kho)
         
-        # Cập nhật bảng Lịch Sử Xuất Thuốc
+        # Cập nhật bảng Lịch Sử
         conn.update(worksheet="LichSu", data=st.session_state.df_ls)
         
-        # Cập nhật bảng Nhân Sự (Xử lý an toàn để tránh lỗi thiếu cột)
+        # Cập nhật bảng Nhân Sự (Xử lý an toàn để không bị lỗi KeyError cột)
+        # Chỉ lấy những cột thực sự đang tồn tại trong bảng để lưu
         cols_ns_safe = [c for c in BASE_COLS_NS if c in st.session_state.df_ns.columns]
         conn.update(worksheet="NhanSu", data=st.session_state.df_ns[cols_ns_safe])
         
-        # Cập nhật các bảng danh mục bổ trợ
+        # Cập nhật các bảng khác
         conn.update(worksheet="ChuongTrinh", data=st.session_state.df_ct)
         conn.update(worksheet="DuTru", data=st.session_state.df_dt)
         conn.update(worksheet="NhomThuoc", data=st.session_state.df_nhom)
         
-        st.toast("☁️ Đã đồng bộ dữ liệu lên Google Sheets thành công!", icon='✅')
+        st.toast("☁️ Đã đồng bộ dữ liệu lên Google Sheets!", icon='✅')
     except Exception as e:
-        st.error(f"Lỗi kết nối khi lưu dữ liệu: {e}")
-        st.info("Mẹo: Đảm bảo bạn đã tắt các file Excel đang mở và kiểm tra kết nối mạng.")
-def save_all():
-    # 1. Sắp xếp lại kho thuốc theo tên Thành Phần trước khi lưu
-    if not st.session_state.df_kho.empty:
-        st.session_state.df_kho = st.session_state.df_kho.sort_values(by='Thành Phần', ascending=True)
+        st.error(f"Lỗi kết nối Cloud: {e}")
         st.toast("💾 Đã đồng bộ dữ liệu!", icon='✅')
 
 def generate_code(nhom, df):
