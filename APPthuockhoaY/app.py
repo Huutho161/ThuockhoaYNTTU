@@ -370,64 +370,79 @@ else:
                 if st.button("🖨️ TẠO PDF IN NHÃN QR"):
                     st.markdown(create_qr_pdf_html(df_nh_res, sel_nh), unsafe_allow_html=True)
 
-    # --- TAB 4: KHO TỔNG (CẢNH BÁO HSD & XÓA) ---
+   # --- TAB 4: KHO TỔNG (PHIÊN BẢN SỬA LỖI KEYERROR) ---
     with tabs[4]:
         st.subheader("📦 Kho tổng (A-Z Thành Phần)")
         
-        # Xử lý Trạng thái HSD (định dạng dd/mm/yyyy)
-        if not st.session_state.df_kho.empty:
+        # 1. Kiểm tra nếu kho trống
+        if st.session_state.df_kho.empty:
+            st.info("Kho hiện đang trống. Hãy nhập thuốc ở tab 'Nhập Kho' hoặc kiểm tra file Google Sheets.")
+        else:
+            # Tự động tạo cột Trạng Thái HSD để đảm bảo nó luôn tồn tại trong DataFrame
             st.session_state.df_kho['Trạng Thái HSD'] = st.session_state.df_kho['Hạn Sử Dụng'].apply(check_hsd_status)
-        
-        st.session_state.df_kho = st.session_state.df_kho.sort_values(by='Thành Phần')
-        
-        # Widgets Thống kê HSD
-        if not st.session_state.df_kho.empty:
+            st.session_state.df_kho = st.session_state.df_kho.sort_values(by='Thành Phần')
+            
+            # 2. Widgets Thống kê HSD
             c_hsd1, c_hsd2, c_hsd3 = st.columns(3)
             expired = len(st.session_state.df_kho[st.session_state.df_kho['Trạng Thái HSD'] == "❌ Hết hạn"])
             warning = len(st.session_state.df_kho[st.session_state.df_kho['Trạng Thái HSD'] == "⚠️ Sắp hết hạn"])
             c_hsd1.metric("Hết hạn", f"{expired} mục", delta=-expired if expired > 0 else 0, delta_color="inverse")
-            c_hsd2.metric("Sắp hết hạn (6th)", f"{warning} mục", delta_color="off")
-            c_hsd3.info("⚠️ Sắp hết hạn: Còn dưới 180 ngày kể từ hôm nay.")
+            c_hsd2.metric("Sắp hết hạn", f"{warning} mục")
+            c_hsd3.info("⚠️ Cảnh báo sắp hết hạn: Còn dưới 180 ngày.")
 
-        # Xuất Excel
-        buf_ex = BytesIO()
-        with pd.ExcelWriter(buf_ex, engine='xlsxwriter') as wr:
-            st.session_state.df_kho.to_excel(wr, index=False)
-        st.download_button("📥 XUẤT EXCEL KHO", buf_ex.getvalue(), f"Kho_{datetime.now().strftime('%d%m%Y')}.xlsx")
-        
-        # CHỨC NĂNG XÓA (Admin mới thấy)
-        is_admin = st.session_state.u_data.get('Quyền') == 'admin'
-        if is_admin:
-            with st.expander("🗑️ CÔNG CỤ XÓA THUỐC"):
-                cx1, cx2 = st.columns(2)
-                with cx1:
-                    st.write("#### 🔍 Xóa đơn lẻ")
-                    thuoc_xoa = st.selectbox("Chọn thuốc cần xóa:", ["---"] + sorted(st.session_state.df_kho['Tên Biệt Dược'].tolist()))
-                    if st.button("❌ XÁC NHẬN XÓA THUỐC NÀY"):
-                        if thuoc_xoa != "---":
-                            st.session_state.df_kho = st.session_state.df_kho[st.session_state.df_kho['Tên Biệt Dược'] != thuoc_xoa]
-                            save_all(); st.success(f"Đã xóa {thuoc_xoa}!"); st.rerun()
-                        else: st.warning("Vui lòng chọn thuốc!")
+            # 3. Xuất file Excel
+            buf_ex = BytesIO()
+            with pd.ExcelWriter(buf_ex, engine='xlsxwriter') as wr:
+                st.session_state.df_kho.to_excel(wr, index=False)
+            st.download_button("📥 XUẤT EXCEL KHO", buf_ex.getvalue(), f"Kho_{datetime.now().strftime('%d%m%Y')}.xlsx")
+            
+            # 4. CHỨC NĂNG QUẢN TRỊ (ADMIN)
+            is_admin = st.session_state.u_data.get('Quyền') == 'admin'
+            if is_admin:
+                with st.expander("🗑️ CÔNG CỤ XÓA THUỐC"):
+                    cx1, cx2 = st.columns(2)
+                    with cx1:
+                        st.write("#### 🔍 Xóa đơn lẻ")
+                        thuoc_xoa = st.selectbox("Chọn thuốc cần xóa:", ["---"] + sorted(st.session_state.df_kho['Tên Biệt Dược'].tolist()))
+                        if st.button("❌ XÁC NHẬN XÓA"):
+                            if thuoc_xoa != "---":
+                                st.session_state.df_kho = st.session_state.df_kho[st.session_state.df_kho['Tên Biệt Dược'] != thuoc_xoa]
+                                save_all(); st.rerun()
 
-                with cx2:
-                    st.write("#### ⚠️ Xóa toàn bộ kho")
-                    confirm_all = st.checkbox("Tôi xác nhận muốn xóa sạch kho thuốc")
-                    if st.button("🔥 XÓA TẤT CẢ DỮ LIỆU KHO"):
-                        if confirm_all:
-                            st.session_state.df_kho = pd.DataFrame(columns=BASE_COLS_KHO)
-                            save_all(); st.success("Kho đã được làm trống!"); st.rerun()
-                        else: st.error("Vui lòng tích vào ô xác nhận trước khi xóa sạch!")
+                    with cx2:
+                        st.write("#### ⚠️ Xóa toàn bộ kho")
+                        confirm_all = st.checkbox("Xác nhận làm trống kho")
+                        if st.button("🔥 XÓA TẤT CẢ"):
+                            if confirm_all:
+                                st.session_state.df_kho = pd.DataFrame(columns=BASE_COLS_KHO)
+                                save_all(); st.rerun()
 
-            st.divider()
-            st.write("#### ✏️ Chỉnh sửa trực tiếp")
-            # Áp dụng styling cho bảng hiển thị
-            df_styled = st.session_state.df_kho.style.applymap(color_hsd, subset=['Trạng Thái HSD'])
-            ed_k = st.data_editor(df_styled, use_container_width=True, hide_index=True, num_rows="dynamic")
-            if st.button("💾 LƯU CHỈNH SỬA KHO"):
-                st.session_state.df_kho = ed_k
-                save_all(); st.rerun()
-        else:
-            st.dataframe(st.session_state.df_kho.style.applymap(color_hsd, subset=['Trạng Thái HSD']), use_container_width=True)
+                st.divider()
+                st.write("#### ✏️ Chỉnh sửa trực tiếp")
+                
+                # --- GIẢI PHÁP SỬA LỖI KEYERROR ---
+                # Bước 1: Tạo bản sao để hiển thị
+                df_to_show = st.session_state.df_kho.copy()
+                
+                # Bước 2: Kiểm tra cột tồn tại rồi mới áp dụng Style
+                if 'Trạng Thái HSD' in df_to_show.columns:
+                    try:
+                        df_styled = df_to_show.style.applymap(color_hsd, subset=['Trạng Thái HSD'])
+                    except:
+                        df_styled = df_to_show # Nếu style lỗi thì hiện bảng thô
+                else:
+                    df_styled = df_to_show
+                
+                # Bước 3: Hiển thị trình chỉnh sửa dữ liệu
+                ed_k = st.data_editor(df_styled, use_container_width=True, hide_index=True, num_rows="dynamic")
+                
+                if st.button("💾 LƯU THAY ĐỔI XUỐNG CLOUD"):
+                    # Chỉ lưu các cột gốc, không lưu cột 'Trạng Thái HSD' tự tạo để tránh làm nặng Sheets
+                    cols_to_save = [c for c in ed_k.columns if c != 'Trạng Thái HSD']
+                    st.session_state.df_kho = ed_k[cols_to_save]
+                    save_all(); st.rerun()
+            else:
+                st.dataframe(st.session_state.df_kho, use_container_width=True)
 
     with tabs[5]:
         st.subheader("📝 Dự trù Chiến dịch")
