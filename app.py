@@ -142,13 +142,14 @@ def get_excel_template():
 # 3. QUẢN LÝ DỮ LIỆU & LOGIC THÔNG MINH
 # ==========================================
 
+# XÓA BỎ HÀM SAVE_ALL CŨ VÀ DÁN ĐOẠN NÀY VÀO:
 def save_all():
     # 1. Sắp xếp lại kho thuốc theo tên Thành Phần trước khi lưu
     if not st.session_state.df_kho.empty:
         st.session_state.df_kho = st.session_state.df_kho.sort_values(by='Thành Phần', ascending=True)
     
     # 2. ĐỒNG BỘ DỮ LIỆU LÊN CLOUD (GOOGLE SHEETS)
-    # Lưu ý: Xóa bỏ hoàn toàn các dòng .to_csv cũ để tránh lỗi KeyError trên Server
+    # LƯU Ý: Đã xóa bỏ hoàn toàn các dòng .to_csv() để tránh lỗi Permission Denied (Lỗi 13)
     try:
         # Cập nhật bảng Kho Thuốc
         conn.update(worksheet="KhoThuoc", data=st.session_state.df_kho)
@@ -156,7 +157,7 @@ def save_all():
         # Cập nhật bảng Lịch Sử Xuất Thuốc
         conn.update(worksheet="LichSu", data=st.session_state.df_ls)
         
-        # Cập nhật bảng Nhân Sự (Xử lý an toàn để tránh lỗi thiếu cột trên Sheets)
+        # Cập nhật bảng Nhân Sự (Xử lý an toàn để tránh lỗi thiếu cột)
         cols_ns_safe = [c for c in BASE_COLS_NS if c in st.session_state.df_ns.columns]
         conn.update(worksheet="NhanSu", data=st.session_state.df_ns[cols_ns_safe])
         
@@ -168,17 +169,12 @@ def save_all():
         st.toast("☁️ Đã đồng bộ dữ liệu lên Google Sheets thành công!", icon='✅')
     except Exception as e:
         st.error(f"Lỗi kết nối khi lưu dữ liệu: {e}")
-        st.info("Kiểm tra lại quyền chia sẻ file Google Sheets hoặc cấu hình Secrets.")
-
+        st.info("Mẹo: Đảm bảo bạn đã tắt các file Excel đang mở và kiểm tra kết nối mạng.")
 def save_all():
-    st.session_state.df_kho = st.session_state.df_kho.sort_values(by='Thành Phần', ascending=True)
-    st.session_state.df_kho[BASE_COLS_KHO].to_csv(FILE_KHO, index=False, encoding='utf-8-sig')
-    st.session_state.df_ls.to_csv(FILE_LICH_SU, index=False, encoding='utf-8-sig')
-    st.session_state.df_ns[BASE_COLS_NS].to_csv(FILE_NHAN_SU, index=False, encoding='utf-8-sig')
-    st.session_state.df_ct.to_csv(FILE_CHUONG_TRINH, index=False, encoding='utf-8-sig')
-    st.session_state.df_dt.to_csv(FILE_DU_TRU, index=False, encoding='utf-8-sig')
-    st.session_state.df_nhom.to_csv(FILE_NHOM_THUOC, index=False, encoding='utf-8-sig')
-    st.toast("💾 Đã đồng bộ dữ liệu!", icon='✅')
+    # 1. Sắp xếp lại kho thuốc theo tên Thành Phần trước khi lưu
+    if not st.session_state.df_kho.empty:
+        st.session_state.df_kho = st.session_state.df_kho.sort_values(by='Thành Phần', ascending=True)
+        st.toast("💾 Đã đồng bộ dữ liệu!", icon='✅')
 
 def generate_code(nhom, df):
     words = str(nhom).split()
